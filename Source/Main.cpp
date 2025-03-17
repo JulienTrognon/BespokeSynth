@@ -1,19 +1,17 @@
-/*
- ==============================================================================
-
- This file was auto-generated!
-
- It contains the basic startup code for a Juce application.
-
- ==============================================================================
- */
-
 #include "juce_gui_basics/juce_gui_basics.h"
 #include <memory>
 #include "VSTScanner.h"
 #include "SynthGlobals.h"
 
 #include "VersionInfo.h"
+
+#include "SynthGlobals.h"
+#include "SignalGenerator.h"
+#include "Amplifier.h"
+#include "OutputChannel.h"
+#include "PatchCable.h"
+#include "PatchCableSource.h"
+#include "UIControlMacros.h"
 
 using namespace juce;
 
@@ -101,6 +99,38 @@ public:
 
       appProperties = std::make_unique<juce::ApplicationProperties>();
       appProperties->setStorageParameters(options);
+
+      // ----- Experiment : no gui + play a sound with modules and patchcables then quit ----- //
+
+      SetGlobalSampleRateAndBufferSize(44100, 512);
+      signalGenerator = std::make_unique<SignalGenerator>();
+      amplifier = std::make_unique<Amplifier>();
+      outputChannel = std::make_unique<OutputChannel>();
+
+      sigGenCableSource = std::make_unique<PatchCableSource>(signalGenerator.get(), kConnectionType_Audio);
+      ampCableSource = std::make_unique<PatchCableSource>(amplifier.get(), kConnectionType_Audio);
+
+      cable1 = std::make_unique<PatchCable>(sigGenCableSource.get());
+      cable2 = std::make_unique<PatchCable>(ampCableSource.get());
+
+      sigGenCableSource->SetPatchCableTarget(cable1.get(), amplifier.get(), false);
+      sigGenCableSource->SetPatchCableTarget(cable2.get(), outputChannel.get(), false);
+
+      float* mFreq = new float(230.0f);
+
+      // signalGenerator->FloatSliderUpdated(
+      //    new FloatSlider(signalGenerator.get(), "freq", 0, 0, 40, 15, mFreq, 1, 4000),
+      //    0.0,
+      //    0);
+      signalGenerator->SetVol(0.5f);
+      // signalGenerator->PlayNote(NoteMessage(5000, 69, 120));
+
+      std::cout << "Experiment running : sin wave playing for 5 sec then exit..." << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(5));
+
+      // quit application
+      shutdown();
+      systemRequestedQuit();
    }
 
    // Prints an error for arguments that expected an argument but were not given one
@@ -148,7 +178,8 @@ public:
       MainWindow(String name)
       : DocumentWindow(name,
                        Colours::lightgrey,
-                       DocumentWindow::allButtons)
+                       DocumentWindow::allButtons,
+                       false)
       {
          setUsingNativeTitleBar(true);
          setContentOwned(createMainContentComponent(), true);
@@ -180,6 +211,16 @@ public:
 private:
    std::unique_ptr<MainWindow> mainWindow;
    std::unique_ptr<PluginScannerSubprocess> storedScannerSubprocess;
+
+   std::unique_ptr<SignalGenerator> signalGenerator;
+   std::unique_ptr<Amplifier> amplifier;
+   std::unique_ptr<OutputChannel> outputChannel;
+   std::unique_ptr<PatchCableSource> sigGenCableSource;
+   std::unique_ptr<PatchCableSource> ampCableSource;
+   std::unique_ptr<PatchCable> cable1;
+   std::unique_ptr<PatchCable> cable2;
+
+   FloatSlider* mFreqSlider{ nullptr };
 };
 
 //==============================================================================
