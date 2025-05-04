@@ -12,6 +12,7 @@
 #include "PatchCable.h"
 #include "PatchCableSource.h"
 #include "UIControlMacros.h"
+#include "ModularSynth.h"
 
 using namespace juce;
 
@@ -100,37 +101,12 @@ public:
       appProperties = std::make_unique<juce::ApplicationProperties>();
       appProperties->setStorageParameters(options);
 
-      // ----- Experiment : no gui + play a sound with modules and patchcables then quit ----- //
-
-      SetGlobalSampleRateAndBufferSize(44100, 512);
-      signalGenerator = std::make_unique<SignalGenerator>();
-      amplifier = std::make_unique<Amplifier>();
-      outputChannel = std::make_unique<OutputChannel>();
-
-      sigGenCableSource = std::make_unique<PatchCableSource>(signalGenerator.get(), kConnectionType_Audio);
-      ampCableSource = std::make_unique<PatchCableSource>(amplifier.get(), kConnectionType_Audio);
-
-      cable1 = std::make_unique<PatchCable>(sigGenCableSource.get());
-      cable2 = std::make_unique<PatchCable>(ampCableSource.get());
-
-      sigGenCableSource->SetPatchCableTarget(cable1.get(), amplifier.get(), false);
-      sigGenCableSource->SetPatchCableTarget(cable2.get(), outputChannel.get(), false);
-
-      float* mFreq = new float(230.0f);
-
-      // signalGenerator->FloatSliderUpdated(
-      //    new FloatSlider(signalGenerator.get(), "freq", 0, 0, 40, 15, mFreq, 1, 4000),
-      //    0.0,
-      //    0);
-      signalGenerator->SetVol(0.5f);
-      // signalGenerator->PlayNote(NoteMessage(5000, 69, 120));
-
-      std::cout << "Experiment running : sin wave playing for 5 sec then exit..." << std::endl;
-      std::this_thread::sleep_for(std::chrono::seconds(5));
+      // std::cout << "Experiment running : sin wave playing for 5 sec then exit..." << std::endl;
+      // std::this_thread::sleep_for(std::chrono::seconds(5));
 
       // quit application
-      shutdown();
-      systemRequestedQuit();
+      // shutdown();
+      // systemRequestedQuit();
    }
 
    // Prints an error for arguments that expected an argument but were not given one
@@ -194,9 +170,52 @@ public:
          // This is called when the user tries to close this window. Here, we'll just
          // ask the app to quit when this happens, but you can change this to do
          // whatever you need.
-         JUCEApplication::getInstance()->systemRequestedQuit();
+
+
+         //==================//
+         //=== Experiment ===//
+         //==================//
+
+         // Signal Generator
+         ModuleFactory::Spawnable sigGenSpawnable;
+         sigGenSpawnable.mLabel = "signalgenerator";
+
+         IDrawableModule* sigGenModule = TheSynth->SpawnModuleOnTheFly(sigGenSpawnable, 400, 200, true, "signalgenerator");
+         TheSynth->SetMoveModule(sigGenModule, 100, 200, true);
+
+         TheSynth->KeyPressed(13, false);
+
+         // Output Channel
+         ModuleFactory::Spawnable outSpawnable;
+         outSpawnable.mLabel = "output";
+
+         IDrawableModule* outModule = TheSynth->SpawnModuleOnTheFly(outSpawnable, 400, 350, true, "output");
+         TheSynth->SetMoveModule(outModule, 100, 200, true);
+
+         TheSynth->KeyPressed(13, false);
+
+
+         // Cable
+         PatchCableSource* sigGenCableSource = new PatchCableSource(sigGenModule, kConnectionType_Audio);
+
+         PatchCable* cableSigGenToOut = new PatchCable(sigGenCableSource);
+         sigGenCableSource->SetPatchCableTarget(cableSigGenToOut, outModule, false);
+
+         sigGenModule->SetUpPatchCables("output");
+
+         // Volume
+         SignalGenerator* sg = dynamic_cast<SignalGenerator*>(sigGenModule);
+         if (sg) {
+            sg->SetVol(0.8f);
+         } else {
+            std::cerr << "sigGenModule is not a SignalGenerator" << std::endl;
+         }
+
+         // Original code
+         // JUCEApplication::getInstance()->systemRequestedQuit();
       }
 
+      
       /* Note: Be careful if you override any DocumentWindow methods - the base
        class uses a lot of them, so by overriding you might break its functionality.
        It's best to do all your work in your content component instead, but if
@@ -211,16 +230,6 @@ public:
 private:
    std::unique_ptr<MainWindow> mainWindow;
    std::unique_ptr<PluginScannerSubprocess> storedScannerSubprocess;
-
-   std::unique_ptr<SignalGenerator> signalGenerator;
-   std::unique_ptr<Amplifier> amplifier;
-   std::unique_ptr<OutputChannel> outputChannel;
-   std::unique_ptr<PatchCableSource> sigGenCableSource;
-   std::unique_ptr<PatchCableSource> ampCableSource;
-   std::unique_ptr<PatchCable> cable1;
-   std::unique_ptr<PatchCable> cable2;
-
-   FloatSlider* mFreqSlider{ nullptr };
 };
 
 //==============================================================================
