@@ -155,7 +155,7 @@ public:
       : DocumentWindow(name,
                        Colours::lightgrey,
                        DocumentWindow::allButtons,
-                       false)
+                       true)
       {
          setUsingNativeTitleBar(true);
          setContentOwned(createMainContentComponent(), true);
